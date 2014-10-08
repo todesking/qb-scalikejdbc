@@ -33,5 +33,12 @@ class QBTest extends Specification {
 
       pending
     }
+
+    "optimize nested relations to flatten form" in {
+      import com.todesking.qb.QueryInterpolation._
+      def filter(rel:Relations, cond:RelationsFilter) = FilteredRelations(rel, cond)
+      QB.optimize(table"foo") === table"foo"
+      QB.optimize(filter(filter(table"foo", col"id" eq 1), col"name" eq "bar")) === filter(table"foo", (col"id" eq 1) and (col"name" eq "bar"))
+    }
   }
 }
