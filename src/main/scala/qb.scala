@@ -45,7 +45,16 @@ object QB {
     case ColumnValue(col) => SqlData(s"${col.name}")
   }
 
-  def optimize(rel:Relations):Relations = rel match {
+  def optimize(rel:Relations):Relations = {
+    val o1 = optimize1(optimizeSubTree(rel))
+    if(o1 == rel) o1
+    else optimize(o1)
+  }
+  def optimizeSubTree(rel:Relations):Relations = rel match {
+    case FilteredRelations(r, c) => FilteredRelations(optimize(r), c)
+    case r => r
+  }
+  def optimize1(rel:Relations):Relations = rel match {
     case FilteredRelations(FilteredRelations(base, cond1), cond2) =>
       FilteredRelations(base, cond1 and cond2)
     case r => r
