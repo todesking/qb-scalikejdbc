@@ -47,6 +47,14 @@ class QBTest extends Specification {
       QB.optimize(filter(filter(foo, c1 eq 1), c2 eq "bar")) === filter(foo, (c1 eq 1) and (c2 eq "bar"))
 
       QB.optimize(filter(filter(filter(foo, c1 eq 1), c2 eq 2), c3 eq 3)) === filter(foo, (c1 eq 1) and (c2 eq 2) and (c3 eq 3))
+
+      QB.optimize(table"t1" select(col"name") where(col"id" eq 1)) === (table"t1" where(col"id" eq 1) select(col"name"))
+
+      QB.optimize(Relations.one prod Relations.one) === Relations.one
+      QB.optimize(Relations.zero prod Relations.one) == Relations.zero
+      QB.optimize(Relations.zero prod Relations.zero) === Relations.zero
+      QB.optimize(Relations.one prod foo) === foo
+      QB.optimize(foo prod Relations.one) === foo
     }
   }
 }

@@ -17,7 +17,7 @@ abstract class SqlDiarect {
 
 object Sql extends SqlDiarect {
   override def buildQuery(rel:Relations):SqlData = {
-    rel match {
+    QB.optimize(rel) match {
       case Relations.zero => SqlData("(SELECT 1 WHERE 1 = 0)")
       case Relations.one => SqlData("(SELECT 1 as __dummy__)")
       case ProjectRelations(rel, cols) => SqlData(s"(SELECT ${cols.map(_.name).mkString(", ")} FROM ") + buildQuery(rel) + SqlData(")")
@@ -35,6 +35,7 @@ object Sql extends SqlDiarect {
       case Eq(col, value) => SqlData(s"${col.name} = ") + createValue(value)
       case Exists(rel) => SqlData("EXISTS ") + buildQuery(rel)
       case In(col, rel) => SqlData(s"${col.name} IN ") + buildQuery(rel)
+      case And(lhs, rhs) => SqlData("(") + createWhere(lhs) + SqlData(" AND ") + createWhere(rhs) + SqlData(")")
     }
   }
 
@@ -64,6 +65,12 @@ object QB {
   def optimize1(rel:Relations):Relations = rel match {
     case FilteredRelations(FilteredRelations(base, cond1), cond2) =>
       FilteredRelations(base, cond1 and cond2)
+    case FilteredRelations(ProjectRelations(r, cols), cond) =>
+      ProjectRelations(FilteredRelations(r, cond), cols)
+    case ProdRelations(Relations.one, r) => r
+    case ProdRelations(r, Relations.one) => r
+    case ProdRelations(Relations.zero, r) => Relations.zero
+    case ProdRelations(r, Relations.zero) => Relations.zero
     case r => r
   }
 }
@@ -79,8 +86,8 @@ sealed abstract class Relations {
 }
 
 object Relations {
-  object one extends Relations
-  object zero extends Relations
+  case object one extends Relations
+  case object zero extends Relations
 }
 
 case class ProjectRelations(rel:Relations, cols:Seq[Column[_]]) extends Relations
