@@ -18,14 +18,15 @@ abstract class SqlDiarect {
 object Sql extends SqlDiarect {
   override def buildQuery(rel:Relations):SqlData = {
     QB.optimize(rel) match {
-      case Relations.zero => SqlData("(SELECT 1 WHERE 1 = 0)")
-      case Relations.one => SqlData("(SELECT 1 as __dummy__)")
-      case ProjectRelations(rel, cols) => SqlData(s"(SELECT ${cols.map(_.name).mkString(", ")} FROM ") + buildQuery(rel) + SqlData(")")
-      case NamedRelations(name) => SqlData(s"(SELECT * FROM ${name})")
+      case Relations.zero => SqlData("SELECT 1 WHERE 1 = 0")
+      case Relations.one => SqlData("SELECT 1 as __dummy__")
+      case ProjectRelations(rel, cols) =>
+        SqlData(s"SELECT ${cols.map(_.name).mkString(", ")} FROM ") + buildQuery(rel).closed
+      case NamedRelations(name) => SqlData(s"SELECT * FROM ${name}")
       case FilteredRelations(rel, cond) =>
-        SqlData("(SELECT * FROM ") + buildQuery(rel) + SqlData(" WHERE ") + createWhere(cond) + SqlData(")")
+        SqlData("SELECT * FROM ") + buildQuery(rel).closed + SqlData(" WHERE ") + createWhere(cond)
       case ProdRelations(lhs, rhs) =>
-        SqlData("(SELECT * FROM ") + buildQuery(lhs) + SqlData(", ") + buildQuery(rhs) + SqlData(")")
+        SqlData("SELECT * FROM ") + buildQuery(lhs).closed + SqlData(", ") + buildQuery(rhs).closed
     }
   }
 
@@ -49,6 +50,7 @@ object Sql extends SqlDiarect {
 case class SqlData(sql:String, parameters:Seq[Any] = Seq.empty) {
   def +(rhs:SqlData):SqlData = SqlData(
     this.sql + rhs.sql, this.parameters ++ rhs.parameters)
+  def closed() = SqlData(s"(${sql})", parameters)
 }
 
 object QB {

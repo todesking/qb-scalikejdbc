@@ -56,5 +56,10 @@ class QBTest extends Specification {
       QB.optimize(Relations.one prod foo) === foo
       QB.optimize(foo prod Relations.one) === foo
     }
+
+    "build sql query" in {
+      import com.todesking.qb.QueryInterpolation._
+      Sql.buildQuery(table"foo") === SqlData("SELECT * FROM foo")
+    }
   }
 }
