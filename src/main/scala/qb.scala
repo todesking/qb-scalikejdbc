@@ -17,20 +17,19 @@ abstract class SqlDiarect {
 
 object Sql extends SqlDiarect {
   override def buildQuery(rel:Relations):SqlData = {
-    QB.optimize(rel) match {
-      case Relations.zero => SqlData("SELECT 1 WHERE 1 = 0")
-      case Relations.one => SqlData("SELECT 1 as __dummy__")
-      case ProjectRelations(IdRefRelations(name), cols) =>
-        SqlData(s"SELECT ${cols.map(_.name).mkString(", ")} FROM ${name}")
-      case ProjectRelations(rel, cols) =>
-        SqlData(s"SELECT ${cols.map(_.name).mkString(", ")} FROM ") + buildQuery(rel).closed
-      case r@(IdRefRelations(_)|NamedRelations(_, _)) =>
-        SqlData("SELECT * FROM ") + buildFromPart(r)
-      case FilteredRelations(rel, cond) =>
-        SqlData("SELECT * FROM ") + buildFromPart(rel) + SqlData(" WHERE ") + createWhere(cond)
-      case ProdRelations(lhs, rhs) =>
-        SqlData("SELECT * FROM ") + buildFromPart(lhs).closed + SqlData(", ") + buildFromPart(rhs).closed
-    }
+    val oRel = QB.optimize(rel)
+    buildSelectPart(oRel) +
+      buildFromPart(oRel).prependIfNotEmpty(" FROM ") +
+      buildWherePart(oRel).prependIfNotEmpty(" WHERE ")
+  }
+
+  def buildSelectPart(rel:Relations):SqlData = rel match {
+    case ProjectRelations(rel, cols) =>
+      SqlData(s"SELECT ${cols.map(_.name).mkString(", ")}")
+    case Relations.zero | Relations.one =>
+      SqlData("SELECT 1 as __dummy__")
+    case _ =>
+      SqlData("SELECT *")
   }
 
   def buildFromPart(rel:Relations):SqlData = rel match {
@@ -38,17 +37,36 @@ object Sql extends SqlDiarect {
       buildFromPart(rel) + SqlData(s" AS ${name}")
     case IdRefRelations(name) =>
       SqlData(name)
-    case r =>
-      buildQuery(r).closed
+    case Relations.zero | Relations.one =>
+      SqlData.zero
+    case FilteredRelations(rel, _) =>
+      buildFromPart(rel)
+    case ProjectRelations(rel, _) =>
+      buildFromPart(rel)
+    case ProdRelations(lhs, rhs) =>
+      buildFromPart(lhs).join(",")(buildFromPart(rhs))
   }
 
-  def createWhere(cond:RelationsFilter):SqlData = {
+  def buildWherePart(rel:Relations):SqlData = rel match {
+    case FilteredRelations(rel, cond) =>
+      buildWherePart(cond)
+    case ProjectRelations(rel, _) =>
+      buildWherePart(rel)
+    case Relations.zero =>
+      SqlData("1 <> 1")
+    case Relations.one =>
+      SqlData("1 = 1")
+    case _ =>
+      SqlData.zero
+  }
+
+  def buildWherePart(cond:RelationsFilter):SqlData = {
     cond match {
       case Like(col, pat) => SqlData(s"${col.name} LIKE ") + createValue(pat)
       case Eq(col, value) => SqlData(s"${col.name} = ") + createValue(value)
       case Exists(rel) => SqlData("EXISTS ") + buildQuery(rel)
       case In(col, rel) => SqlData(s"${col.name} IN ") + buildQuery(rel)
-      case And(lhs, rhs) => SqlData("(") + createWhere(lhs) + SqlData(" AND ") + createWhere(rhs) + SqlData(")")
+      case And(lhs, rhs) => SqlData("(") + buildWherePart(lhs) + SqlData(" AND ") + buildWherePart(rhs) + SqlData(")")
     }
   }
 
@@ -62,7 +80,24 @@ object Sql extends SqlDiarect {
 case class SqlData(sql:String, parameters:Seq[Any] = Seq.empty) {
   def +(rhs:SqlData):SqlData = SqlData(
     this.sql + rhs.sql, this.parameters ++ rhs.parameters)
+  def join(sep:String)(rhs:SqlData):SqlData = {
+    val joinedParams:Seq[Any] = this.parameters ++ rhs.parameters
+    if(this.sql.isEmpty)
+      SqlData(rhs.sql, joinedParams)
+    else if(rhs.sql.isEmpty)
+      SqlData(this.sql, joinedParams)
+    else
+      SqlData(this.sql + sep + rhs.sql, joinedParams)
+  }
   def closed() = SqlData(s"(${sql})", parameters)
+  def isEmpty = sql.isEmpty && parameters.isEmpty
+  def map(f:SqlData => SqlData):SqlData =
+    if(isEmpty) this else f(this)
+  def prependIfNotEmpty(str:String):SqlData =
+    map {s => copy(sql = s"${str}${s.sql}") }
+}
+object SqlData {
+  val zero = SqlData("")
 }
 
 object QB {
