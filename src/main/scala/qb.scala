@@ -45,6 +45,8 @@ object Sql extends SqlDiarect {
       buildFromPart(rel)
     case ProdRelations(lhs, rhs) =>
       buildFromPart(lhs).join(", ")(buildFromPart(rhs))
+    case LeftInnerJoin(lhs, rhs, on) =>
+      buildFromPart(lhs) + " LEFT INNER JOIN " + buildFromPart(rhs) + " ON(" + buildWherePart(on) + ")"
   }
 
   def buildWherePart(rel:Relations):SqlData = rel match {
@@ -80,6 +82,7 @@ object Sql extends SqlDiarect {
 case class SqlData(sql:String, parameters:Seq[Any] = Seq.empty) {
   def +(rhs:SqlData):SqlData = SqlData(
     this.sql + rhs.sql, this.parameters ++ rhs.parameters)
+  def +(rhs:String):SqlData = this + SqlData(rhs)
   def join(sep:String)(rhs:SqlData):SqlData = {
     val joinedParams:Seq[Any] = this.parameters ++ rhs.parameters
     if(this.sql.isEmpty)
@@ -132,6 +135,7 @@ sealed abstract class Relations {
   def exists() = Exists(this)
   def select(cols:Column[_]*) = new ProjectRelations(this, cols)
   def prod(rhs:Relations) = new ProdRelations(this, rhs)
+  def leftInnerJoin(rel:Relations, on:RelationsFilter) = new LeftInnerJoin(this, rel, on)
 }
 
 object Relations {
@@ -144,6 +148,7 @@ case class IdRefRelations(name:String) extends Relations
 case class NamedRelations(name:String, rel:Relations) extends Relations
 case class FilteredRelations(rel:Relations, condition:RelationsFilter) extends Relations
 case class ProdRelations(lhs:Relations, rhs:Relations) extends Relations
+case class LeftInnerJoin(lhs:Relations, rhs:Relations, on:RelationsFilter) extends Relations
 
 sealed abstract class ValueRef
 case class ConstantValue(value:Any) extends ValueRef
