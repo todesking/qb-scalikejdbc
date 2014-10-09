@@ -11,23 +11,21 @@ object QueryInterpolation {
   }
 }
 
-case class SqlData(sql:String, parameters:Seq[Any] = Seq.empty) {
-  def +(rhs:SqlData):SqlData = SqlData(
-    this.sql + rhs.sql, this.parameters ++ rhs.parameters)
+abstract class SqlDiarect {
+  def buildQuery(rel:Relations):SqlData
 }
 
-object QB {
-  def builder() = new Builder()
-  def createSqlDataFrom(rel:Relations):SqlData = {
+object Sql extends SqlDiarect {
+  override def buildQuery(rel:Relations):SqlData = {
     rel match {
       case Relations.zero => SqlData("(SELECT 1 WHERE 1 = 0)")
       case Relations.one => SqlData("(SELECT 1 as __dummy__)")
-      case ProjectRelations(rel, cols) => SqlData(s"(SELECT ${cols.map(_.name).mkString(", ")} FROM ") + createSqlDataFrom(rel) + SqlData(")")
+      case ProjectRelations(rel, cols) => SqlData(s"(SELECT ${cols.map(_.name).mkString(", ")} FROM ") + buildQuery(rel) + SqlData(")")
       case NamedRelations(name) => SqlData(s"(SELECT * FROM ${name})")
       case FilteredRelations(rel, cond) =>
-        SqlData("(SELECT * FROM ") + createSqlDataFrom(rel) + SqlData(" WHERE ") + createWhere(cond) + SqlData(")")
+        SqlData("(SELECT * FROM ") + buildQuery(rel) + SqlData(" WHERE ") + createWhere(cond) + SqlData(")")
       case ProdRelations(lhs, rhs) =>
-        SqlData("(SELECT * FROM ") + createSqlDataFrom(lhs) + SqlData(", ") + createSqlDataFrom(rhs) + SqlData(")")
+        SqlData("(SELECT * FROM ") + buildQuery(lhs) + SqlData(", ") + buildQuery(rhs) + SqlData(")")
     }
   }
 
@@ -35,8 +33,8 @@ object QB {
     cond match {
       case Like(col, pat) => SqlData(s"${col.name} LIKE ") + createValue(pat)
       case Eq(col, value) => SqlData(s"${col.name} = ") + createValue(value)
-      case Exists(rel) => SqlData("EXISTS ") + createSqlDataFrom(rel)
-      case In(col, rel) => SqlData(s"${col.name} IN ") + createSqlDataFrom(rel)
+      case Exists(rel) => SqlData("EXISTS ") + buildQuery(rel)
+      case In(col, rel) => SqlData(s"${col.name} IN ") + buildQuery(rel)
     }
   }
 
@@ -45,6 +43,15 @@ object QB {
     case ColumnValue(col) => SqlData(s"${col.name}")
   }
 
+}
+
+case class SqlData(sql:String, parameters:Seq[Any] = Seq.empty) {
+  def +(rhs:SqlData):SqlData = SqlData(
+    this.sql + rhs.sql, this.parameters ++ rhs.parameters)
+}
+
+object QB {
+  def builder() = new Builder()
   def optimize(rel:Relations):Relations = {
     val o1 = optimize1(optimizeSubTree(rel))
     if(o1 == rel) o1

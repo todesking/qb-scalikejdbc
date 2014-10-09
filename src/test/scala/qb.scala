@@ -27,7 +27,7 @@ class QBTest extends Specification {
         col"category_id" in(table"categories" select(col"id"))
       query.where += col"category_id" eq data.categoryId
 
-      val statement = QB.createSqlDataFrom(query.toRelations)
+      val statement = Sql.buildQuery(query.toRelations)
       println(statement.sql)
       statement.parameters === Seq("%foo%", 1)
 
