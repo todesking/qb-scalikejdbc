@@ -44,7 +44,7 @@ object Sql extends SqlDiarect {
     case ProjectRelations(rel, _) =>
       buildFromPart(rel)
     case ProdRelations(lhs, rhs) =>
-      buildFromPart(lhs).join(",")(buildFromPart(rhs))
+      buildFromPart(lhs).join(", ")(buildFromPart(rhs))
   }
 
   def buildWherePart(rel:Relations):SqlData = rel match {
