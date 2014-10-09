@@ -66,7 +66,7 @@ object Sql extends SqlDiarect {
       case Eq(col, value) => SqlData(s"${col.name} = ") + createValue(value)
       case Exists(rel) => SqlData("EXISTS ") + buildQuery(rel)
       case In(col, rel) => SqlData(s"${col.name} IN ") + buildQuery(rel)
-      case And(lhs, rhs) => SqlData("(") + buildWherePart(lhs) + SqlData(" AND ") + buildWherePart(rhs) + SqlData(")")
+      case And(lhs, rhs) => (buildWherePart(lhs) + SqlData(" AND ") + buildWherePart(rhs)).closed
     }
   }
 
