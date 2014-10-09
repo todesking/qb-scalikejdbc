@@ -66,8 +66,8 @@ object Sql extends SqlDiarect {
     cond match {
       case Like(col, pat) => SqlData(s"${col.name} LIKE ") + createValue(pat)
       case Eq(col, value) => SqlData(s"${col.name} = ") + createValue(value)
-      case Exists(rel) => SqlData("EXISTS ") + buildQuery(rel)
-      case In(col, rel) => SqlData(s"${col.name} IN ") + buildQuery(rel)
+      case Exists(rel) => SqlData("EXISTS ") + buildQuery(rel).closed
+      case In(col, rel) => SqlData(s"${col.name} IN ") + buildQuery(rel).closed
       case And(lhs, rhs) => (buildWherePart(lhs) + SqlData(" AND ") + buildWherePart(rhs)).closed
     }
   }

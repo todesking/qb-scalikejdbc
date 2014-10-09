@@ -74,6 +74,14 @@ class QBTest extends Specification {
       Sql.buildQuery(table"foo" select(col"id") where(col"name" eq 1)) === SqlData("SELECT id FROM foo WHERE name = ?", Seq(1))
 
       Sql.buildQuery(table"foo" as("f") leftInnerJoin(table"bar" as("b"), on = col"id" eq col"f.id") where(col"age" eq 10)) === SqlData("SELECT * FROM foo AS f LEFT INNER JOIN bar AS b ON(id = f.id) WHERE age = ?", Seq(10))
+
+      Sql.buildQuery(table"foo" where(col"age" eq 10)) === SqlData("SELECT * FROM foo WHERE age = ?", Seq(10))
+
+      Sql.buildQuery(table"foo" where(col"id" in (table"owners" select(col"user_id")))) === SqlData("SELECT * FROM foo WHERE id IN (SELECT user_id FROM owners)")
+
+      Sql.buildQuery(table"foo" where(col"name" like "Alice%")) === SqlData("SELECT * FROM foo WHERE name LIKE ?", Seq("Alice%"))
+
+      Sql.buildQuery(table"foo" where(table"foo" exists())) === SqlData("SELECT * FROM foo WHERE EXISTS (SELECT * FROM foo)")
     }
   }
 }
