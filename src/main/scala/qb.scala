@@ -2,7 +2,7 @@ package com.todesking.qb
 
 object QueryInterpolation {
   implicit class StringContextExt(c:StringContext) {
-    def table(args:Any*) = new NamedRelations(toS(args))
+    def table(args:Any*) = new IdRefRelations(toS(args))
     def col(args:Any*) = Column[Any](toS(args))
 
     private def toS(args:Seq[Any]):String = {
@@ -20,14 +20,26 @@ object Sql extends SqlDiarect {
     QB.optimize(rel) match {
       case Relations.zero => SqlData("SELECT 1 WHERE 1 = 0")
       case Relations.one => SqlData("SELECT 1 as __dummy__")
+      case ProjectRelations(IdRefRelations(name), cols) =>
+        SqlData(s"SELECT ${cols.map(_.name).mkString(", ")} FROM ${name}")
       case ProjectRelations(rel, cols) =>
         SqlData(s"SELECT ${cols.map(_.name).mkString(", ")} FROM ") + buildQuery(rel).closed
-      case NamedRelations(name) => SqlData(s"SELECT * FROM ${name}")
+      case r@(IdRefRelations(_)|NamedRelations(_, _)) =>
+        SqlData("SELECT * FROM ") + buildFromPart(r)
       case FilteredRelations(rel, cond) =>
-        SqlData("SELECT * FROM ") + buildQuery(rel).closed + SqlData(" WHERE ") + createWhere(cond)
+        SqlData("SELECT * FROM ") + buildFromPart(rel) + SqlData(" WHERE ") + createWhere(cond)
       case ProdRelations(lhs, rhs) =>
-        SqlData("SELECT * FROM ") + buildQuery(lhs).closed + SqlData(", ") + buildQuery(rhs).closed
+        SqlData("SELECT * FROM ") + buildFromPart(lhs).closed + SqlData(", ") + buildFromPart(rhs).closed
     }
+  }
+
+  def buildFromPart(rel:Relations):SqlData = rel match {
+    case NamedRelations(name, rel) =>
+      buildFromPart(rel) + SqlData(s" AS ${name}")
+    case IdRefRelations(name) =>
+      SqlData(name)
+    case r =>
+      buildQuery(r).closed
   }
 
   def createWhere(cond:RelationsFilter):SqlData = {
@@ -79,7 +91,7 @@ object QB {
 
 // Set of rows
 sealed abstract class Relations {
-  def as(newName:String) = new NamedRelations(newName)
+  def as(newName:String) = new NamedRelations(newName, this)
   def where(cond:RelationsFilter) = new FilteredRelations(this, cond)
   def exists(rel:Relations) = new FilteredRelations(this, Exists(rel))
   def exists() = Exists(this)
@@ -93,11 +105,9 @@ object Relations {
 }
 
 case class ProjectRelations(rel:Relations, cols:Seq[Column[_]]) extends Relations
-
-case class NamedRelations(name:String) extends Relations
-
+case class IdRefRelations(name:String) extends Relations
+case class NamedRelations(name:String, rel:Relations) extends Relations
 case class FilteredRelations(rel:Relations, condition:RelationsFilter) extends Relations
-
 case class ProdRelations(lhs:Relations, rhs:Relations) extends Relations
 
 sealed abstract class ValueRef

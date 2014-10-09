@@ -60,6 +60,10 @@ class QBTest extends Specification {
     "build sql query" in {
       import com.todesking.qb.QueryInterpolation._
       Sql.buildQuery(table"foo") === SqlData("SELECT * FROM foo")
+
+      Sql.buildQuery(table"foo" select(col"id")) === SqlData("SELECT id FROM foo")
+
+      Sql.buildQuery(table"foo" as "bar") === SqlData("SELECT * FROM foo AS bar")
     }
   }
 }
