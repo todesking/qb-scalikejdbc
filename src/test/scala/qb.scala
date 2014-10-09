@@ -70,6 +70,8 @@ class QBTest extends Specification {
       Sql.buildQuery(table"foo" prod table"bar") === SqlData("SELECT * FROM foo, bar")
 
       Sql.buildQuery(table"foo" prod table"bar" where(col"id" eq 1) select(col"a")) === SqlData("SELECT a FROM foo, bar WHERE id = ?", Seq(1))
+
+      Sql.buildQuery(table"foo" select(col"id") where(col"name" eq 1)) === SqlData("SELECT id FROM foo WHERE name = ?", Seq(1))
     }
   }
 }
