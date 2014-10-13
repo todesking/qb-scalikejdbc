@@ -13,11 +13,13 @@ class ScalikeJdbcIntegrationTest extends Specification {
   ConnectionPool.singleton("jdbc:h2:mem:test", "sa", "")
 
   implicit val session = AutoSession
+  sql"create schema test".update().apply()
+  sql"set schema test".update().apply()
 
   trait ctx extends Around {
     override def around[T:AsResult](t: =>T) = {
       sql"create table person(id integer not null primary key, name varchar(255) not null)".update().apply()
-      try { AsResult(t) } finally { sql"drop table person".update().apply() }
+      try { AsResult(t) } finally { sql"drop table if exists person".update().apply() }
     }
   }
 
@@ -30,6 +32,10 @@ class ScalikeJdbcIntegrationTest extends Specification {
       val p = Person.syntax("p")
 
       col(p.id) === col"p.id"
+    }
+
+    "integrate table names" in new ctx {
+      table(Person) === table"person"
     }
   }
 }
