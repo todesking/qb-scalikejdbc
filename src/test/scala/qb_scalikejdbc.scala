@@ -10,11 +10,9 @@ class ScalikeJdbcIntegrationTest extends Specification {
   import com.todesking.qb.QueryInterpolation._
 
   Class.forName("org.h2.Driver")
-  ConnectionPool.singleton("jdbc:h2:mem:test", "sa", "")
+  ConnectionPool.singleton("jdbc:h2:mem:", "", "")
 
   implicit val session = AutoSession
-  sql"create schema test".update().apply()
-  sql"set schema test".update().apply()
 
   trait ctx extends Around {
     override def around[T:AsResult](t: =>T) = {
@@ -36,6 +34,11 @@ class ScalikeJdbcIntegrationTest extends Specification {
 
     "integrate table names" in new ctx {
       table(Person) === table"person"
+    }
+
+    "integrate syntax as table name" in new ctx {
+      val p = Person.syntax("p")
+      table(p) === table"p"
     }
   }
 }
